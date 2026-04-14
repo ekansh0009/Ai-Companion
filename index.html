@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="avatar">🤖</div>
+    <div class="name">AI Assistant</div>
+    <button onclick="startCall()">📞</button>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat" class="chat"></div>
+
+  <!-- Typing -->
+  <div id="typing" class="typing">AI is typing...</div>
+
+  <!-- Input -->
+  <div class="inputBox">
+    <button onclick="startVoice()">🎤</button>
+    <input id="msg" placeholder="Type a message..." />
+    <button onclick="sendMsg()">➤</button>
+  </div>
+
+</div>
+
+<audio id="remoteAudio" autoplay></audio>
+
+<script src="app.js"></script>
+</body>
+</html>
