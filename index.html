@@ -1,37 +1,639 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>AI Chat</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Companion – WhatsApp Style</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:        #0b141a;
+  --panel:     #111b21;
+  --header:    #202c33;
+  --input-bg:  #2a3942;
+  --bubble-ai: #202c33;
+  --bubble-me: #005c4b;
+  --accent:    #00a884;
+  --accent2:   #25d366;
+  --text:      #e9edef;
+  --sub:       #8696a0;
+  --border:    #2a3942;
+  --tick-blue: #53bdeb;
+  --hover:     #182229;
+  --shadow:    0 1px 2px rgba(0,0,0,.4);
+  --radius:    8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center}
+
+/* ─── LAYOUT ─────────────────────────────────────────────── */
+.shell{width:100%;max-width:480px;height:100vh;display:flex;flex-direction:column;position:relative;background:var(--panel)}
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+.header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--header);min-height:60px;flex-shrink:0}
+.av{width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;position:relative}
+.av .dot{position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;background:var(--accent2);border:2px solid var(--header)}
+.hinfo{flex:1}
+.hname{font-weight:600;font-size:15px;line-height:1.2}
+.hstatus{font-size:12px;color:var(--accent2)}
+.hbtns{display:flex;gap:4px}
+.hbtn{background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:6px;border-radius:50%;transition:background .15s}
+.hbtn:hover{background:var(--hover)}
+
+/* ─── WALLPAPER ──────────────────────────────────────────── */
+.wallpaper{position:absolute;inset:60px 0 70px 0;background-color:var(--bg);background-image:
+  radial-gradient(circle at 20% 30%,rgba(0,168,132,.04) 0%,transparent 60%),
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M20 20 Q40 10 60 20 Q70 40 60 60 Q40 70 20 60 Q10 40 20 20Z' fill='none' stroke='%232a3942' stroke-width='1' opacity='.4'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0}
+
+/* ─── CHAT ───────────────────────────────────────────────── */
+.chat{flex:1;overflow-y:auto;padding:8px 12px 8px;display:flex;flex-direction:column;gap:2px;position:relative;z-index:1;scroll-behavior:smooth}
+.chat::-webkit-scrollbar{width:4px}
+.chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* date divider */
+.date-div{text-align:center;margin:8px 0}
+.date-div span{font-size:11.5px;background:rgba(17,27,33,.85);color:var(--sub);padding:4px 10px;border-radius:8px}
+
+/* bubble */
+.bubble{max-width:72%;padding:7px 10px 20px;border-radius:10px;font-size:14px;line-height:1.45;position:relative;word-break:break-word;box-shadow:var(--shadow);animation:pop .18s ease-out}
+@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.bubble.ai{background:var(--bubble-ai);align-self:flex-start;border-top-left-radius:2px}
+.bubble.me{background:var(--bubble-me);align-self:flex-end;border-top-right-radius:2px}
+
+/* meta (time + tick) */
+.bmeta{position:absolute;bottom:4px;right:8px;display:flex;align-items:center;gap:3px;font-size:10.5px;color:var(--sub);white-space:nowrap}
+.tick{font-size:13px;line-height:1}
+.tick.blue{color:var(--tick-blue)}
+
+/* reactions */
+.reactions{display:flex;gap:3px;position:absolute;bottom:-14px;left:6px}
+.rxn{font-size:14px;background:var(--header);border-radius:20px;padding:1px 5px;cursor:pointer;border:1px solid var(--border)}
+.bubble.me .reactions{left:auto;right:6px}
+
+/* ─── TYPING ─────────────────────────────────────────────── */
+.typing-wrap{padding:4px 12px;min-height:24px;position:relative;z-index:1}
+.typing-bubble{display:none;background:var(--bubble-ai);border-radius:10px;border-top-left-radius:2px;padding:10px 14px;width:fit-content;align-items:center;gap:4px}
+.typing-bubble.show{display:flex}
+.dot-anim{width:7px;height:7px;border-radius:50%;background:var(--sub);animation:bounce 1.2s infinite}
+.dot-anim:nth-child(2){animation-delay:.2s}
+.dot-anim:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* ─── SCROLL TO BOTTOM ───────────────────────────────────── */
+.scroll-btn{position:absolute;bottom:80px;right:16px;width:36px;height:36px;border-radius:50%;background:var(--header);border:1px solid var(--border);color:var(--sub);font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.scroll-btn.show{display:flex}
+.scroll-btn .badge{position:absolute;top:-4px;right:-4px;background:var(--accent2);color:#111;font-size:9px;border-radius:10px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-weight:700;padding:0 3px}
+
+/* ─── INPUT BAR ──────────────────────────────────────────── */
+.inputBar{display:flex;align-items:flex-end;gap:8px;padding:8px 12px;background:var(--header);position:relative;z-index:10;flex-shrink:0}
+.emoji-btn,.mic-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--sub);padding:8px 4px;flex-shrink:0;transition:color .15s}
+.emoji-btn:hover,.mic-btn:hover{color:var(--text)}
+.mic-btn.recording{color:#f15c5c;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.msg-input-wrap{flex:1;background:var(--input-bg);border-radius:22px;padding:8px 14px;display:flex;align-items:flex-end}
+#msg{background:none;border:none;color:var(--text);font-size:15px;font-family:inherit;width:100%;resize:none;outline:none;max-height:120px;line-height:1.4;overflow-y:auto}
+#msg::placeholder{color:var(--sub)}
+.send-btn{width:46px;height:46px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
+.send-btn:hover{background:#008f71}
+.send-btn:active{transform:scale(.93)}
+
+/* ─── EMOJI PICKER ───────────────────────────────────────── */
+.emoji-panel{position:absolute;bottom:72px;left:8px;background:var(--header);border-radius:12px;padding:12px;display:none;flex-wrap:wrap;gap:4px;width:280px;max-height:200px;overflow-y:auto;z-index:20;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.emoji-panel.show{display:flex}
+.ep-emoji{font-size:22px;cursor:pointer;padding:4px;border-radius:6px;transition:background .1s}
+.ep-emoji:hover{background:var(--hover)}
+
+/* ─── REACTION PICKER ────────────────────────────────────── */
+.rxn-picker{position:fixed;background:var(--header);border-radius:24px;padding:6px 10px;gap:6px;display:none;z-index:30;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.rxn-picker.show{display:flex}
+.rxn-pick-item{font-size:22px;cursor:pointer;padding:4px;border-radius:50%;transition:transform .15s}
+.rxn-pick-item:hover{transform:scale(1.3)}
+
+/* ─── CONTEXT MENU ───────────────────────────────────────── */
+.ctx-menu{position:fixed;background:var(--header);border-radius:var(--radius);min-width:160px;z-index:40;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.6);overflow:hidden;display:none}
+.ctx-menu.show{display:block}
+.ctx-item{padding:12px 16px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background .12s}
+.ctx-item:hover{background:var(--hover)}
+.ctx-item.danger{color:#f15c5c}
+
+/* ─── MODALS ─────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--header);border-radius:12px;padding:24px;width:300px;text-align:center}
+.modal h3{margin-bottom:12px;font-size:16px}
+.modal p{color:var(--sub);font-size:13px;margin-bottom:20px}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{padding:8px 20px;border-radius:8px;border:none;font-size:14px;cursor:pointer;font-family:inherit}
+.mbtn.cancel{background:var(--input-bg);color:var(--text)}
+.mbtn.confirm{background:var(--accent);color:#fff}
+
+/* ─── MENU DROPDOWN ──────────────────────────────────────── */
+.menu-drop{position:absolute;top:56px;right:8px;background:var(--header);border-radius:var(--radius);min-width:180px;z-index:30;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.5);overflow:hidden;display:none}
+.menu-drop.show{display:block}
+.menu-item{padding:12px 16px;font-size:14px;cursor:pointer;transition:background .12s}
+.menu-item:hover{background:var(--hover)}
+.menu-item.danger{color:#f15c5c}
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--header);color:var(--text);padding:8px 18px;border-radius:20px;font-size:13px;border:1px solid var(--border);z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ─── FEATURE BAR ────────────────────────────────────────── */
+.feat-bar{display:flex;gap:6px;padding:6px 12px 2px;background:var(--panel);z-index:5;flex-shrink:0;overflow-x:auto}
+.feat-bar::-webkit-scrollbar{display:none}
+.ftag{background:var(--input-bg);color:var(--sub);font-size:11.5px;border-radius:14px;padding:4px 10px;cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:all .15s}
+.ftag.active,.ftag:hover{border-color:var(--accent);color:var(--accent)}
+</style>
 </head>
 <body>
 
-<div class="app">
+<div class="shell" id="shell">
 
-  <!-- Header -->
+  <!-- ── HEADER ── -->
   <div class="header">
-    <div class="avatar">🤖</div>
-    <div class="name">AI Assistant</div>
-    <button onclick="startCall()">📞</button>
+    <div class="av">🤖<span class="dot"></span></div>
+    <div class="hinfo">
+      <div class="hname">AI Companion</div>
+      <div class="hstatus" id="hstatus">online</div>
+    </div>
+    <div class="hbtns">
+      <button class="hbtn" title="Voice Call" onclick="startCall()">📞</button>
+      <button class="hbtn" title="Search" onclick="searchChat()">🔍</button>
+      <button class="hbtn" title="Menu" onclick="toggleMenu()">⋮</button>
+    </div>
+    <div class="menu-drop" id="menuDrop">
+      <div class="menu-item" onclick="clearChat()">🗑 Clear Chat</div>
+      <div class="menu-item" onclick="exportChat()">💾 Export Chat</div>
+      <div class="menu-item" onclick="toggleVoiceReply()">🔊 <span id="voiceLabel">Voice Reply: OFF</span></div>
+      <div class="menu-item" onclick="showAbout()">ℹ About</div>
+    </div>
   </div>
 
-  <!-- Chat -->
-  <div id="chat" class="chat"></div>
-
-  <!-- Typing -->
-  <div id="typing" class="typing">AI is typing...</div>
-
-  <!-- Input -->
-  <div class="inputBox">
-    <button onclick="startVoice()">🎤</button>
-    <input id="msg" placeholder="Type a message..." />
-    <button onclick="sendMsg()">➤</button>
+  <!-- ── FEATURE QUICK-TAGS ── -->
+  <div class="feat-bar">
+    <span class="ftag" onclick="insertPrompt('Tell me a fun fact 🎲')">Fun Fact</span>
+    <span class="ftag" onclick="insertPrompt('Write a short poem 🌸')">Poem</span>
+    <span class="ftag" onclick="insertPrompt('Give me a motivational quote 💪')">Motivation</span>
+    <span class="ftag" onclick="insertPrompt('Tell me a joke 😂')">Joke</span>
+    <span class="ftag" onclick="insertPrompt('Explain a concept simply 🧠')">Explain</span>
+    <span class="ftag" onclick="insertPrompt('What should I cook today? 🍳')">Recipe</span>
   </div>
+
+  <!-- ── WALLPAPER ── -->
+  <div class="wallpaper"></div>
+
+  <!-- ── CHAT ── -->
+  <div class="chat" id="chat"></div>
+
+  <!-- ── TYPING ── -->
+  <div class="typing-wrap">
+    <div class="typing-bubble" id="typingBubble">
+      <div class="dot-anim"></div>
+      <div class="dot-anim"></div>
+      <div class="dot-anim"></div>
+    </div>
+  </div>
+
+  <!-- ── SCROLL TO BOTTOM ── -->
+  <button class="scroll-btn" id="scrollBtn" onclick="scrollToBottom()">↓<span class="badge" id="unreadBadge" style="display:none">0</span></button>
+
+  <!-- ── INPUT BAR ── -->
+  <div class="inputBar">
+    <button class="emoji-btn" title="Emoji" onclick="toggleEmoji()">😊</button>
+    <div class="msg-input-wrap">
+      <textarea id="msg" rows="1" placeholder="Type a message…"></textarea>
+    </div>
+    <button class="mic-btn" id="micBtn" title="Voice Input" onclick="startVoice()">🎤</button>
+    <button class="send-btn" onclick="sendMsg()">➤</button>
+  </div>
+
+  <!-- ── EMOJI PANEL ── -->
+  <div class="emoji-panel" id="emojiPanel"></div>
 
 </div>
 
-<audio id="remoteAudio" autoplay></audio>
+<!-- ── REACTION PICKER ── -->
+<div class="rxn-picker" id="rxnPicker">
+  <span class="rxn-pick-item" onclick="addReaction('❤️')">❤️</span>
+  <span class="rxn-pick-item" onclick="addReaction('😂')">😂</span>
+  <span class="rxn-pick-item" onclick="addReaction('👍')">👍</span>
+  <span class="rxn-pick-item" onclick="addReaction('😮')">😮</span>
+  <span class="rxn-pick-item" onclick="addReaction('😢')">😢</span>
+  <span class="rxn-pick-item" onclick="addReaction('🔥')">🔥</span>
+</div>
 
-<script src="app.js"></script>
+<!-- ── CONTEXT MENU ── -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxCopy()">📋 Copy</div>
+  <div class="ctx-item" onclick="ctxReact()">😊 React</div>
+  <div class="ctx-item danger" onclick="ctxDelete()">🗑 Delete</div>
+</div>
+
+<!-- ── CLEAR CONFIRM MODAL ── -->
+<div class="modal-bg" id="clearModal">
+  <div class="modal">
+    <h3>Clear Chat?</h3>
+    <p>All messages and memory will be cleared. This cannot be undone.</p>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModal('clearModal')">Cancel</button>
+      <button class="mbtn confirm" onclick="confirmClear()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ABOUT MODAL ── -->
+<div class="modal-bg" id="aboutModal">
+  <div class="modal">
+    <h3>AI Companion 2.0</h3>
+    <p>A WhatsApp-style AI chat with emoji reactions, voice input, memory, and more. Powered by Claude.</p>
+    <div class="modal-btns">
+      <button class="mbtn cancel" onclick="closeModal('aboutModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const MODEL = "claude-sonnet-4-20250514";
+const SYSTEM = `You are a warm, friendly AI companion in a WhatsApp-style chat. 
+Keep replies concise (1–4 sentences usually) unless asked for something long.
+Use occasional emojis naturally. Be helpful, fun, and conversational.`;
+
+// ─── STATE ────────────────────────────────────────────────
+let history = [];           // {role,content}[]
+let voiceReply = false;
+let recognition = null;
+let isRecording = false;
+let unreadCount = 0;
+let atBottom = true;
+let ctxTarget = null;       // bubble element for context menu
+let rxnTarget = null;       // bubble element for reaction picker
+
+// ─── EMOJI DATA ───────────────────────────────────────────
+const EMOJIS = "😀😁😂🤣😃😄😅😆😊😋😎😍🥰😘😗🤔💀👻👽🤖😻💬💭🙏👍👏🫶❤️🧡💛💚💙💜🖤🔥⚡🌈🌸🌺🎉🎊🎈🎁🍕🍔🍦🍰☕🎵🎶🎸🎹🏆🌍🌙⭐🌟💫";
+const emojiPanel = document.getElementById("emojiPanel");
+EMOJIS.split("").forEach(e => {
+  const span = document.createElement("span");
+  span.className = "ep-emoji";
+  span.textContent = e;
+  span.onclick = () => insertEmoji(e);
+  emojiPanel.appendChild(span);
+});
+
+// ─── HELPERS ─────────────────────────────────────────────
+function now() {
+  return new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+}
+function todayLabel() {
+  const d = new Date();
+  return d.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"});
+}
+function showToast(msg, ms=2000) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), ms);
+}
+function scrollToBottom() {
+  const chat = document.getElementById("chat");
+  chat.scrollTop = chat.scrollHeight;
+  unreadCount = 0;
+  document.getElementById("unreadBadge").style.display = "none";
+  document.getElementById("scrollBtn").classList.remove("show");
+}
+function insertPrompt(text) {
+  document.getElementById("msg").value = text;
+  document.getElementById("msg").focus();
+}
+function insertEmoji(e) {
+  const input = document.getElementById("msg");
+  input.value += e;
+  input.focus();
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove("show");
+}
+
+// ─── CHAT SCROLL TRACKING ─────────────────────────────────
+document.getElementById("chat").addEventListener("scroll", () => {
+  const chat = document.getElementById("chat");
+  const dist = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+  atBottom = dist < 60;
+  if (atBottom) {
+    unreadCount = 0;
+    document.getElementById("unreadBadge").style.display = "none";
+    document.getElementById("scrollBtn").classList.remove("show");
+  }
+});
+
+// ─── DATE DIVIDER ─────────────────────────────────────────
+let dividerShown = false;
+function maybeShowDivider() {
+  if (!dividerShown) {
+    dividerShown = true;
+    const d = document.createElement("div");
+    d.className = "date-div";
+    d.innerHTML = `<span>${todayLabel()}</span>`;
+    document.getElementById("chat").appendChild(d);
+  }
+}
+
+// ─── ADD BUBBLE ───────────────────────────────────────────
+function addBubble(text, side, tick="") {
+  maybeShowDivider();
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = `bubble ${side}`;
+  div.dataset.text = text;
+
+  const meta = `<span class="bmeta"><span class="time">${now()}</span>${side==="me"?`<span class="tick" id="tick-${Date.now()}">${tick}</span>`:""}</span>`;
+  const rxns = `<span class="reactions"></span>`;
+  div.innerHTML = `<span class="btext">${formatText(text)}</span>${rxns}${meta}`;
+
+  // context menu
+  div.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    openCtxMenu(e, div);
+  });
+  div.addEventListener("touchstart", handleLongPress, {passive:true});
+  div.addEventListener("touchend", cancelLongPress);
+
+  chat.appendChild(div);
+
+  if (atBottom) {
+    chat.scrollTop = chat.scrollHeight;
+  } else {
+    unreadCount++;
+    const badge = document.getElementById("unreadBadge");
+    badge.textContent = unreadCount;
+    badge.style.display = "flex";
+    document.getElementById("scrollBtn").classList.add("show");
+  }
+  return div;
+}
+
+function formatText(t) {
+  // bold **text**
+  t = t.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  // italic *text*
+  t = t.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  // newlines
+  t = t.replace(/\n/g, "<br>");
+  return t;
+}
+
+// ─── LONG PRESS ───────────────────────────────────────────
+let lpTimer;
+function handleLongPress(e) {
+  lpTimer = setTimeout(() => openCtxMenu(e.touches[0], e.currentTarget), 500);
+}
+function cancelLongPress() { clearTimeout(lpTimer); }
+
+// ─── CONTEXT MENU ─────────────────────────────────────────
+function openCtxMenu(e, bubble) {
+  ctxTarget = bubble;
+  const menu = document.getElementById("ctxMenu");
+  menu.style.left = Math.min(e.clientX, window.innerWidth-180) + "px";
+  menu.style.top  = Math.min(e.clientY, window.innerHeight-150) + "px";
+  menu.classList.add("show");
+}
+function closeCtxMenu() { document.getElementById("ctxMenu").classList.remove("show"); }
+
+function ctxCopy() {
+  if (!ctxTarget) return;
+  navigator.clipboard.writeText(ctxTarget.dataset.text || "").then(() => showToast("Copied!"));
+  closeCtxMenu();
+}
+function ctxReact() {
+  if (!ctxTarget) return;
+  rxnTarget = ctxTarget;
+  const rect = ctxTarget.getBoundingClientRect();
+  const picker = document.getElementById("rxnPicker");
+  picker.style.top  = (rect.top - 52) + "px";
+  picker.style.left = rect.left + "px";
+  picker.classList.add("show");
+  closeCtxMenu();
+}
+function ctxDelete() {
+  if (!ctxTarget) { closeCtxMenu(); return; }
+  ctxTarget.style.transition = "opacity .2s";
+  ctxTarget.style.opacity = "0";
+  setTimeout(() => ctxTarget.remove(), 200);
+  closeCtxMenu();
+}
+
+// ─── REACTIONS ────────────────────────────────────────────
+function addReaction(emoji) {
+  if (!rxnTarget) return;
+  const rxns = rxnTarget.querySelector(".reactions");
+  // toggle: if same emoji exists, remove it
+  const existing = [...rxns.children].find(r => r.dataset.emoji === emoji);
+  if (existing) { existing.remove(); }
+  else {
+    const span = document.createElement("span");
+    span.className = "rxn";
+    span.dataset.emoji = emoji;
+    span.textContent = emoji;
+    span.onclick = () => span.remove();
+    rxns.appendChild(span);
+  }
+  document.getElementById("rxnPicker").classList.remove("show");
+}
+
+// ─── SEND MESSAGE ─────────────────────────────────────────
+async function sendMsg() {
+  const input = document.getElementById("msg");
+  const text = input.value.trim();
+  if (!text) return;
+
+  closeAllPanels();
+  input.value = "";
+  input.style.height = "";
+
+  const myBubble = addBubble(text, "me", "✓");
+  const tick = myBubble.querySelector(".tick");
+
+  history.push({role:"user", content:text});
+  document.getElementById("hstatus").textContent = "typing…";
+  document.getElementById("typingBubble").classList.add("show");
+
+  try {
+    const res = await fetch("https://backend-4mfb.onrender.com", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: history
+      })
+    });
+
+    const data = await res.json();
+    document.getElementById("typingBubble").classList.remove("show");
+    document.getElementById("hstatus").textContent = "online";
+
+    if (tick) { tick.textContent = "✓✓"; tick.classList.add("blue"); }
+
+    const reply = data.content?.[0]?.text || "Sorry, I couldn't respond right now.";
+    history.push({role:"assistant", content:reply});
+
+    addBubble(reply, "ai");
+
+    if (voiceReply) speakText(reply);
+
+  } catch(err) {
+    document.getElementById("typingBubble").classList.remove("show");
+    document.getElementById("hstatus").textContent = "online";
+    addBubble("Connection error. Please try again.", "ai");
+    history.pop();
+  }
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────
+const msgEl = document.getElementById("msg");
+msgEl.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+msgEl.addEventListener("input", () => {
+  msgEl.style.height = "auto";
+  msgEl.style.height = Math.min(msgEl.scrollHeight, 120) + "px";
+});
+
+// ─── VOICE INPUT ─────────────────────────────────────────
+function startVoice() {
+  if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    showToast("Voice not supported in this browser");
+    return;
+  }
+  if (isRecording) {
+    recognition?.stop();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = "en-IN";
+  recognition.interimResults = true;
+  isRecording = true;
+  document.getElementById("micBtn").classList.add("recording");
+  recognition.start();
+  recognition.onresult = e => {
+    msgEl.value = [...e.results].map(r => r[0].transcript).join("");
+  };
+  recognition.onend = () => {
+    isRecording = false;
+    document.getElementById("micBtn").classList.remove("recording");
+  };
+}
+
+// ─── VOICE OUTPUT ────────────────────────────────────────
+function speakText(text) {
+  const utt = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,""));
+  utt.rate = 1.05;
+  speechSynthesis.speak(utt);
+}
+
+// ─── EMOJI PANEL ─────────────────────────────────────────
+function toggleEmoji() {
+  emojiPanel.classList.toggle("show");
+}
+
+// ─── MENU ────────────────────────────────────────────────
+function toggleMenu() {
+  document.getElementById("menuDrop").classList.toggle("show");
+}
+function closeAllPanels() {
+  emojiPanel.classList.remove("show");
+  document.getElementById("menuDrop").classList.remove("show");
+  document.getElementById("rxnPicker").classList.remove("show");
+  closeCtxMenu();
+}
+
+// ─── CLEAR CHAT ──────────────────────────────────────────
+function clearChat() {
+  closeAllPanels();
+  document.getElementById("clearModal").classList.add("show");
+}
+function confirmClear() {
+  document.getElementById("chat").innerHTML = "";
+  history = [];
+  dividerShown = false;
+  closeModal("clearModal");
+  showToast("Chat cleared");
+}
+
+// ─── EXPORT CHAT ─────────────────────────────────────────
+function exportChat() {
+  closeAllPanels();
+  const msgs = history.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join("\n\n");
+  const blob = new Blob([msgs], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `ai-chat-${Date.now()}.txt`;
+  a.click();
+  showToast("Chat exported!");
+}
+
+// ─── VOICE REPLY TOGGLE ──────────────────────────────────
+function toggleVoiceReply() {
+  voiceReply = !voiceReply;
+  document.getElementById("voiceLabel").textContent = `Voice Reply: ${voiceReply?"ON":"OFF"}`;
+  showToast(`Voice reply ${voiceReply?"enabled":"disabled"}`);
+  closeAllPanels();
+}
+
+// ─── SEARCH ──────────────────────────────────────────────
+function searchChat() {
+  const q = prompt("Search messages:");
+  if (!q) return;
+  const bubbles = document.querySelectorAll(".bubble");
+  let found = 0;
+  bubbles.forEach(b => {
+    b.style.outline = "none";
+    if (b.dataset.text?.toLowerCase().includes(q.toLowerCase())) {
+      b.style.outline = "2px solid var(--accent)";
+      b.scrollIntoView({behavior:"smooth",block:"center"});
+      found++;
+    }
+  });
+  showToast(found ? `Found ${found} result(s)` : "No results");
+}
+
+// ─── ABOUT ───────────────────────────────────────────────
+function showAbout() {
+  closeAllPanels();
+  document.getElementById("aboutModal").classList.add("show");
+}
+
+// ─── CALL STUB ───────────────────────────────────────────
+function startCall() {
+  showToast("📞 Calling… (not connected to server)");
+}
+
+// ─── GLOBAL CLICK (close panels) ─────────────────────────
+document.addEventListener("click", e => {
+  if (!e.target.closest(".emoji-btn") && !e.target.closest(".emoji-panel"))
+    emojiPanel.classList.remove("show");
+  if (!e.target.closest(".hbtn") && !e.target.closest(".menu-drop"))
+    document.getElementById("menuDrop").classList.remove("show");
+  if (!e.target.closest(".rxn-picker"))
+    document.getElementById("rxnPicker").classList.remove("show");
+  if (!e.target.closest(".ctx-menu") && !e.target.closest(".bubble"))
+    closeCtxMenu();
+});
+
+// ─── WELCOME MESSAGE ─────────────────────────────────────
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    addBubble("Hey! 👋 I'm your AI Companion. Ask me anything, share a thought, or just say hi!", "ai");
+  }, 400);
+});
+</script>
 </body>
 </html>
